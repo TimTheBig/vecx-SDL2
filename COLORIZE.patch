@@ -1,0 +1,194 @@
+diff -r vecx-SDL2-master/src/emu/e6809.c src/emu/e6809.c
+137a138,143
+> extern unsigned char *red;
+> extern unsigned char *green;
+> extern unsigned char *blue;
+> extern unsigned char RED_COMPONENT;
+> extern unsigned char GREEN_COMPONENT;
+> extern unsigned char BLUE_COMPONENT;
+139a146,149
+>         if (red[address] | green[address] | blue[address]) {
+> 	  RED_COMPONENT = red[address]; GREEN_COMPONENT = green[address]; BLUE_COMPONENT = blue[address];
+> 	  // trigger a different drawing colour
+>         }
+148a159,162
+>         if (red[address] | green[address] | blue[address]) {
+> 	  RED_COMPONENT = red[address]; GREEN_COMPONENT = green[address]; BLUE_COMPONENT = blue[address];
+> 	  // trigger a different drawing colour
+>         }
+
+diff -r vecx-SDL2-master/src/emu/edac.c src/emu/edac.c
+8c8,12
+< void(*dac_add_line) (int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint8_t color);
+---
+> extern unsigned char RED_COMPONENT;
+> extern unsigned char GREEN_COMPONENT;
+> extern unsigned char BLUE_COMPONENT;
+> 
+> void(*dac_add_line) (int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint8_t intensity, uint8_t r, uint8_t g, uint8_t b);
+133c137,140
+< 			DAC.vector_color = (uint8_t)DAC.zsh;
+---
+> 			DAC.vector_intensity = (uint8_t)DAC.zsh;
+> 			DAC.vector_r = RED_COMPONENT;
+> 			DAC.vector_g = GREEN_COMPONENT;
+> 			DAC.vector_b = BLUE_COMPONENT;
+148c155
+< 				DAC.vector_color);
+---
+> 				     DAC.vector_intensity, RED_COMPONENT, GREEN_COMPONENT, BLUE_COMPONENT);
+152c159
+< 			(uint8_t)DAC.zsh != DAC.vector_color)
+---
+> 			(uint8_t)DAC.zsh != DAC.vector_intensity)
+159c166
+< 				DAC.vector_color);
+---
+> 				     DAC.vector_intensity, RED_COMPONENT, GREEN_COMPONENT, BLUE_COMPONENT);
+173c180,183
+< 				DAC.vector_color = (uint8_t)DAC.zsh;
+---
+> 				DAC.vector_intensity = (uint8_t)DAC.zsh;
+> 				DAC.vector_r = RED_COMPONENT;
+> 				DAC.vector_g = GREEN_COMPONENT;
+> 				DAC.vector_b = BLUE_COMPONENT;
+
+diff -r vecx-SDL2-master/src/emu/edac.h src/emu/edac.h
+37c37,40
+< 	uint8_t vector_color;
+---
+> 	uint8_t vector_intensity;
+>         uint8_t vector_r;
+>         uint8_t vector_g;
+>         uint8_t vector_b;
+42c45
+< extern void(*dac_add_line) (int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint8_t color);
+---
+> extern void(*dac_add_line) (int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint8_t intensity, uint8_t r, uint8_t g, uint8_t b);
+
+diff -r vecx-SDL2-master/src/emu/vecx.c src/emu/vecx.c
+3a4
+> #include <stdlib.h> // for rand
+171c172
+< static void addline(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint8_t color)
+---
+> static void addline(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint8_t intensity, uint8_t r, uint8_t g, uint8_t b)
+177c178,181
+< 	vectors[vector_draw_cnt].color = color;
+---
+> 	vectors[vector_draw_cnt].intensity = intensity;
+> 	vectors[vector_draw_cnt].r = r;
+> 	vectors[vector_draw_cnt].g = g;
+> 	vectors[vector_draw_cnt].b = b;
+
+diff -r vecx-SDL2-master/src/emu/vecx.h src/emu/vecx.h
+7c7
+< 	VECTREX_COLORS = 128,     /* number of possible colors ... grayscale */
+---
+> 	VECTREX_LEVELS = 128,     /* number of possible colors ... grayscale */
+29c29
+< 				 /* color [0, VECTREX_COLORS - 1], if color = VECTREX_COLORS, then this is
+---
+> 				 /* intensity [0, VECTREX_LEVELS - 1], if intensity = VECTREX_LEVELS, then this is
+32c32,33
+< 	uint8_t color;
+---
+> 	uint8_t intensity;
+>         uint8_t r, g, b;
+
+diff -r vecx-SDL2-master/src/main.c src/main.c
+13a14,20
+> unsigned char RED_COMPONENT = 255;
+> unsigned char GREEN_COMPONENT = 255;
+> unsigned char BLUE_COMPONENT = 255;
+> unsigned char *red;
+> unsigned char *green;
+> unsigned char *blue;
+> 
+47c54,57
+< 			Uint8 c = vectors[v].color * 256 / VECTREX_COLORS;
+---
+> 			Uint8 c = vectors[v].intensity * 256 / VECTREX_LEVELS;
+> 			Uint8 r = vectors[v].r;
+> 			Uint8 g = vectors[v].g;
+> 			Uint8 b = vectors[v].b;
+53c63
+< 			SDL_SetRenderDrawColor(renderer, 255, 255, 255, c);
+---
+> 			SDL_SetRenderDrawColor(renderer, r, g, b, c);
+245c255,266
+< 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
+---
+>   SDL_RendererInfo info;
+>   int i=0, r;
+>   r = SDL_GetNumRenderDrivers();
+>   while ( i < r )
+>   {
+>         if ( SDL_GetRenderDriverInfo(i,&info) == 0 )
+> 	{
+> 	  printf("%s\n",info.name);
+> 	}
+>         i++;
+>   }
+>         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0)
+261,262c282,287
+< 		fprintf(stderr, "Failed to create renderer: %s\n", SDL_GetError());
+< 		return 0;
+---
+> 	        renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_SOFTWARE);
+> 	        if (!renderer)
+> 	        {
+> 		        fprintf(stderr, "Failed to create renderer: %s\n", SDL_GetError());
+> 		        return 0;
+> 	        }
+324a350
+>         int i;
+329a356,375
+> 	red = malloc(0x10000); green = malloc(0x10000); blue = malloc(0x10000);
+> 	if (red == NULL || green == NULL || blue == NULL) {
+> 	  fprintf(stderr, "vecx: not enough memory to allocate colour array\n");
+> 	  exit(1);
+> 	}
+> 	for (i = 0; i < 0x10000; i++) {
+> 	  red[i] = green[i] = blue[i] = 0;
+> 	}
+> 
+>         // set up a few trivial triggers in Minestorm for demo purposes
+>         // hopefully the player's ship
+> 	// for loaded games, these would be pulled in from an accompanying file along with
+> 	// the cartridge data... but for the built-in game, we might as well build it in...
+> 	red[0xe304] = 255; green[0xe304] = 255;                     // colourize the ship yellow
+> 	red[0xe30a] = 255; green[0xe30a] = 255; blue[0xe30a] = 255; // return to B/W
+> 	
+> 	//red[0xe1e1] = 0;   green[0xe1e1] = 255; blue[0xe1e1] = 255; // explosions
+> 	//red[0xe1e4] = 255; green[0xe1e4] = 255; blue[0xe1e4] = 255; // return to B/W
+> 
+> 	
+
+diff -r vecx-SDL2-master/src/ser.c src/ser.c
+5,9c5,9
+< #include "emu\e6522.h"
+< #include "emu\e6809.h"
+< #include "emu\e8910.h"
+< #include "emu\edac.h"
+< #include "emu\vecx.h"
+---
+> #include "emu/e6522.h"
+> #include "emu/e6809.h"
+> #include "emu/e8910.h"
+> #include "emu/edac.h"
+> #include "emu/vecx.h"
+184c184,187
+< 	fread(&DAC.vector_color, sizeof(DAC.vector_color), 1, file);
+---
+> 	fread(&DAC.vector_intensity, sizeof(DAC.vector_intensity), 1, file);
+> 	fread(&DAC.vector_r, sizeof(DAC.vector_r), 1, file);
+> 	fread(&DAC.vector_g, sizeof(DAC.vector_g), 1, file);
+> 	fread(&DAC.vector_b, sizeof(DAC.vector_b), 1, file);
+210c213,216
+< 	fwrite(&DAC.vector_color, sizeof(DAC.vector_color), 1, file);
+---
+> 	fwrite(&DAC.vector_intensity, sizeof(DAC.vector_intensity), 1, file);
+> 	fwrite(&DAC.vector_r, sizeof(DAC.vector_r), 1, file);
+> 	fwrite(&DAC.vector_g, sizeof(DAC.vector_g), 1, file);
+> 	fwrite(&DAC.vector_b, sizeof(DAC.vector_b), 1, file);
